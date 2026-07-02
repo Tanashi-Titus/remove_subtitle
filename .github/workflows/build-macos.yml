@@ -7,6 +7,14 @@ on:
     tags: ["v*"]
 
 jobs:
+  # Job CHẨN ĐOÁN: Linux chạy tức thì với mọi tài khoản. Nếu job này XONG nhanh mà
+  # các job macOS bên dưới vẫn Queued -> vấn đề là runner macOS bị chặn ở tài khoản
+  # (thường do chưa thêm phương thức thanh toán), không phải lỗi workflow.
+  probe-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Linux runner OK"
+
   build:
     name: Build ${{ matrix.arch }} (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
