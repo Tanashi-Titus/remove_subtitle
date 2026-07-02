@@ -1,0 +1,50 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Local AI/Claude config
+.claude/
+
+# Build output
+build/
+dist/
+
+# Output folders
+vmake_output/
+output/
+outputs/
+downloads/
+temp/
+tmp/
+
+# Media files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.mp3
+*.wav
+
+# Archives / installers
+*.zip
+*.rar
+*.7z
+*.exe
+*.msi
+*.dmg
+*.pkg
+
+# Env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

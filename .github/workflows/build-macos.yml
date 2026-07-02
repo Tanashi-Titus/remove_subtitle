@@ -1,0 +1,27 @@
+name: Build macOS app
+
+# Chạy thủ công trong tab Actions (Run workflow), hoặc khi đẩy tag v*.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: macos-13          # Intel/x86_64 -> .app chạy được cả Intel lẫn Apple Silicon (Rosetta)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build .app (ffmpeg + Chromium nhúng sẵn)
+        run: bash build_mac.sh
+
+      - name: Tải kết quả lên (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TNT_VideoSubtitleRemover-mac
+          path: dist/TNT_VideoSubtitleRemover-mac.zip
+          if-no-files-found: error
