@@ -8,7 +8,16 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13          # Intel/x86_64 -> .app chạy được cả Intel lẫn Apple Silicon (Rosetta)
+    name: Build ${{ matrix.arch }} (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false            # 1 kiến trúc lỗi/chờ lâu KHÔNG huỷ cái kia
+      matrix:
+        include:
+          - runner: macos-14      # Apple Silicon (M1/M2/M3…) -> app arm64, runner sẵn, cấp nhanh
+            arch: arm64
+          - runner: macos-13      # Intel x86_64 -> app chạy Mac Intel (runner có thể chờ lâu hơn)
+            arch: intel
     steps:
       - uses: actions/checkout@v4
 
@@ -16,12 +25,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build .app (ffmpeg + Chromium nhúng sẵn)
+      - name: Build .app (ffmpeg + Chromium nhúng sẵn, đúng kiến trúc runner)
         run: bash build_mac.sh
 
       - name: Tải kết quả lên (artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: TNT_VideoSubtitleRemover-mac
+          name: TNT_VideoSubtitleRemover-mac-${{ matrix.arch }}
           path: dist/TNT_VideoSubtitleRemover-mac.zip
           if-no-files-found: error

@@ -11,15 +11,27 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt pyinstaller
 
-echo "==> 2/5 Tải ffmpeg/ffprobe STATIC cho mac vào vendor/ffmpeg"
+echo "==> 2/5 Tải ffmpeg/ffprobe STATIC cho mac vào vendor/ffmpeg (đúng kiến trúc)"
 mkdir -p vendor/ffmpeg
 if [ ! -x vendor/ffmpeg/ffmpeg ]; then
-  curl -L -o /tmp/ffmpeg.zip  https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
-  curl -L -o /tmp/ffprobe.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
+  # PHẢI khớp kiến trúc runner: arm64 (Apple Silicon) hay x86_64 (Intel). Nếu nhúng
+  # ffmpeg Intel vào app arm64 thì máy Apple Silicon phải có Rosetta mới chạy được ->
+  # tải bản static theo đúng arch (martin-riedl.de có cả 2 arch, static, không phụ
+  # thuộc dylib).
+  case "$(uname -m)" in
+    arm64)   MR=arm64 ;;
+    x86_64)  MR=amd64 ;;
+    *)       MR=amd64 ;;
+  esac
+  echo "   Kiến trúc runner: $(uname -m) -> tải ffmpeg $MR"
+  curl -fL -o /tmp/ffmpeg.zip  "https://ffmpeg.martin-riedl.de/redirect/latest/macos/${MR}/release/ffmpeg.zip"
+  curl -fL -o /tmp/ffprobe.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/${MR}/release/ffprobe.zip"
   unzip -o /tmp/ffmpeg.zip  -d vendor/ffmpeg
   unzip -o /tmp/ffprobe.zip -d vendor/ffmpeg
   chmod +x vendor/ffmpeg/ffmpeg vendor/ffmpeg/ffprobe
 fi
+# Xác minh binary khớp kiến trúc máy đang build (bắt lỗi sớm nếu tải nhầm arch).
+file vendor/ffmpeg/ffmpeg || true
 
 echo "==> 3/5 Nạp Chromium cho Playwright"
 python -m playwright install chromium
