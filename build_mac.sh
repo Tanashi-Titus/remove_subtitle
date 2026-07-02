@@ -59,8 +59,22 @@ find "$APP/Contents/Frameworks/ms-playwright" -type f \
   \( -name 'Chromium' -o -name 'chrome_crashpad_handler' -o -name '*.app' -prune \
      -o -path '*/MacOS/*' \) -exec chmod +x {} \; 2>/dev/null || true
 chmod +x "$APP/Contents/Frameworks/ffmpeg/ffmpeg" "$APP/Contents/Frameworks/ffmpeg/ffprobe" 2>/dev/null || true
-# ad-hoc sign toàn bộ (giúp nested binary chạy sau khi gỡ quarantine)
-codesign --force --deep --sign - "$APP" || echo "(codesign ad-hoc lỗi — vẫn dùng được sau xattr)"
+
+# .links của Playwright là thư mục HARDLINK metadata -> 'codesign --deep' báo 'bundle
+# format unrecognized' rồi BỎ KÝ cả app. Launch Chromium KHÔNG cần .links (Playwright
+# tự dò theo chromium-<rev>), nên xoá đi để ký sạch.
+rm -rf "$APP/Contents/Frameworks/ms-playwright/.links"
+
+# arm64 BẮT BUỘC chữ ký hợp lệ mới chạy: ký ffmpeg/ffprobe trước, rồi ký cả .app.
+# NẾU KÝ LỖI -> DỪNG build (không ship app hỏng như trước).
+echo "  Ký ad-hoc ffmpeg/ffprobe + toàn bộ .app…"
+codesign --force -s - "$APP/Contents/Frameworks/ffmpeg/ffmpeg"
+codesign --force -s - "$APP/Contents/Frameworks/ffmpeg/ffprobe"
+codesign --force --deep --sign - "$APP"
+echo "  Verify chữ ký:"
+codesign --verify --strict "$APP/Contents/Frameworks/ffmpeg/ffmpeg" || { echo "  *** ffmpeg CHƯA ký — DỪNG"; exit 1; }
+codesign --verify "$APP" || { echo "  *** .app CHƯA ký hợp lệ — DỪNG"; exit 1; }
+echo "  Chữ ký OK (ffmpeg + .app)."
 
 echo "==> Đóng gói zip giữ nguyên symlink/quyền"
 ( cd dist && ditto -c -k --sequesterRsrc --keepParent \
