@@ -19,7 +19,11 @@ import os
 import shutil
 
 BUNDLE_FFMPEG = True
-BUNDLE_CHROMIUM = True
+# Chromium KHÔNG nhúng qua PyInstaller: trên macOS arm64 PyInstaller codesign từng
+# file, gặp nested bundle của Chromium ('Google Chrome for Testing.app' + .framework)
+# -> lỗi 'bundle format unrecognized' -> build fail. Thay vào đó build_mac.sh copy
+# Chromium vào .app SAU pyinstaller rồi 'codesign --deep' ký gọn cả bundle.
+BUNDLE_CHROMIUM = False
 
 from PyInstaller.utils.hooks import collect_all
 

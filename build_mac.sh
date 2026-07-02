@@ -41,6 +41,18 @@ rm -rf build dist
 pyinstaller tnt_video_tool_mac.spec
 
 APP="dist/TNT_VideoSubtitleRemover.app"
+
+echo "==> 4b/5 Copy Chromium vào .app SAU pyinstaller"
+# KHÔNG để PyInstaller nhúng/ký Chromium: trên arm64 nó codesign TỪNG FILE, gặp
+# nested bundle 'Google Chrome for Testing.app' + .framework -> 'bundle format
+# unrecognized' -> build fail. Vì vậy spec đặt BUNDLE_CHROMIUM=False, còn Chromium
+# được copy vào đây rồi bước 'codesign --deep' cuối (hiểu cấu trúc bundle) ký gọn.
+MSP="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/Library/Caches/ms-playwright}"
+DEST="$APP/Contents/Frameworks/ms-playwright"
+mkdir -p "$DEST"
+cp -R "$MSP/." "$DEST/"
+echo "   Đã copy Chromium từ $MSP -> $DEST"
+
 echo "==> 5/5 Sửa quyền thực thi cho Chromium nhúng + ad-hoc codesign"
 # datas của PyInstaller mất bit +x -> cấp lại cho mọi mach-o của chromium
 find "$APP/Contents/Frameworks/ms-playwright" -type f \
