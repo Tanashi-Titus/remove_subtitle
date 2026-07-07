@@ -70,6 +70,25 @@ QGroupBox::title {{
     color: #FFFFFF; border-radius: 6px;
 }}
 
+/* Tab: macOS mặc định render chữ trắng trên nền trắng -> mất tên tab. Ép style
+   theo tone thương hiệu: tab thường nền kem chữ maroon, tab chọn nền cam chữ trắng. */
+QTabWidget::pane {{
+    border: 1px solid #E8D5CD; border-radius: 12px;
+    background: #FFFFFF; top: -1px;
+}}
+QTabWidget::tab-bar {{ left: 8px; }}
+QTabBar {{ background: transparent; }}
+QTabBar::tab {{
+    background: #F2E6DF; color: {MAROON};
+    border: 1px solid #E8D5CD;
+    border-top-left-radius: 9px; border-top-right-radius: 9px;
+    padding: 8px 18px; margin-right: 4px; font-weight: 700;
+}}
+QTabBar::tab:selected {{
+    background: {ORANGE}; color: #FFFFFF; border-color: {ORANGE};
+}}
+QTabBar::tab:hover:!selected {{ color: {ORANGE_DARK}; border-color: {ORANGE}; }}
+
 QLineEdit, QDoubleSpinBox, QComboBox {{
     border: 1px solid #D8C2B9; border-radius: 7px; padding: 6px 9px;
     background: #FFFFFF; color: {MAROON_DEEP};
