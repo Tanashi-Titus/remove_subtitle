@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QProgressBar, QMessageBox, QFrame, QTabWidget,
 )
 
+from tnt_license import check_license
 import video_utils as vu
 import vmake_client
 
@@ -796,6 +797,7 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    check_license("TNT_VideoSubtitle")   # BẢO MẬT LICENSE — kiểm trước khi mở app.
     app = QApplication(sys.argv)
     app.setStyleSheet(STYLESHEET)
     w = MainWindow()

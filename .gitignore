@@ -48,3 +48,7 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# License riêng của từng máy — KHÔNG commit, KHÔNG đóng gói kèm exe.
+license.key
+machine_id.txt

@@ -735,6 +735,34 @@ def open_login(session_path, should_finish, log=print):
 # KHÔNG dính "task-card-layout--" (div layout bên trong card, không có nút xoá).
 TASK_CARD_SELECTOR = 'div[class*="task-card--"]'
 
+# Ô upload ĐƠN — ô DUY NHẤT dùng được ở luồng MIỄN PHÍ.
+# Trang có 3 ô input[type=file]: 1 ô đơn (multiple=false) + 2 ô "Batch upload"
+# (multiple=true, đang ẩn). TUYỆT ĐỐI không nạp file vào ô [multiple]: nó nhảy
+# sang trang trả phí /batch-upload ("Plus 3 file, Pro 30 file") và XOÁ SẠCH task
+# đang xử lý. Vì vậy luôn khoá selector bằng :not([multiple]) thay vì .first.
+SINGLE_FILE_INPUT_SELECTOR = 'input[type="file"]:not([multiple])'
+
+# vmake DỰNG LẠI ô input sau mỗi lần up thành công. Nếu lần nạp kế rơi trúng lúc
+# đó, file bị NUỐT IM LẶNG: set_input_files vẫn "thành công", nhưng không có card
+# nào sinh ra -> chính là lỗi "không thấy card '...' sau khi up". Cách trị: nạp
+# xong XÁC NHẬN có card mới (card hiện sau ~0.5s), chưa có thì nạp lại ngay.
+UPLOAD_CONFIRM_S = 2.0   # cửa sổ chờ card mới (đo thực tế: 0.4–0.7s)
+UPLOAD_TRIES = 4         # đo thực tế: lần 2 luôn ăn
+
+
+def _wait_new_card(page, before, timeout=UPLOAD_CONFIRM_S):
+    """
+    Chờ có CARD MỚI so với `before` (số card trước khi nạp). Trả về card mới —
+    vmake CHÈN card mới lên ĐẦU danh sách — hoặc None nếu file bị nuốt.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        page.wait_for_timeout(150)
+        cards = _leaf_cards(page)
+        if len(cards) > before:
+            return cards[0]
+    return None
+
 
 def _leaf_cards(page):
     """
@@ -768,15 +796,12 @@ def _leaf_card_by_name(page, name):
     return None
 
 
-def _wait_task_card(page, name, timeout=45, before=None):
+def _wait_task_card(page, name, timeout=45):
     """
-    Chờ CARD LÁ mang đúng TÊN xuất hiện sau khi upload.
-
-    Khi NHIỀU video xử lý song song, vmake render NHÃN TÊN trong card khá trễ (có
-    thể >25s) dù card đã hiện -> match theo tên bị lỡ, báo nhầm 'không thấy card'.
-    Vì vậy: nếu hết giờ theo tên NHƯNG số card đã TĂNG so với `before` (tức upload
-    đã vào, chỉ nhãn tên chưa kịp) thì vẫn coi là OK và trả card mới nhất. Việc ghép
-    đúng tên sẽ được đối chiếu lại lúc TẢI (_card_match_name) khi nhãn đã hiện.
+    Chờ CARD LÁ mang đúng TÊN xuất hiện (nhãn tên render trễ, có thể ~15–20s sau
+    khi card hiện). Chỉ cần khi loại xoá ≠ Smart — lúc đó phải bấm đúng card để
+    chọn loại + Apply. Việc CÓ lên hay không đã do _batch_upload xác nhận bằng
+    card mới, nên ở đây không đoán mò theo số lượng nữa.
     """
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -784,10 +809,6 @@ def _wait_task_card(page, name, timeout=45, before=None):
         if c is not None:
             return c
         page.wait_for_timeout(300)
-    if before is not None:
-        cards = _leaf_cards(page)
-        if len(cards) > before:
-            return cards[-1]   # đã có card mới, nhãn tên render trễ -> chấp nhận
     return None
 
 
@@ -918,41 +939,45 @@ def _apply_type_in_card(page, card, removal_type, log):
         log("  (Không thấy nút Apply trong card)")
 
 
-def _batch_upload(page, src, log, first):
-    """Up 1 video vào phiên: đoạn đầu nạp trên trang upload đã sạch; đoạn sau bấm
-    nút '+ Upload' trên cùng."""
-    if first:
-        # process_videos đã goto UPLOAD_URL + xoá task -> thử nạp ngay.
-        if _upload_via_input(page, src, log, lambda: False, timeout=8):
-            return
-        # phòng hờ: mở lại trang upload rồi nạp.
-        page.goto(UPLOAD_URL, wait_until="domcontentloaded")
-        _wait_dom_ready(page)
-        _dismiss_overlays(page, log)
-        _clear_all_task_cards(page, log)
-        if _upload_via_input(page, src, log, lambda: False):
-            return
-        if _upload_via_button(page, src, log):
-            return
-        raise RuntimeError("không thấy ô upload (video đầu)")
-    # Video sau: bấm nút '+ Upload' -> hộp chọn file. Thử 2 lần vì cú click đầu đôi
-    # khi KHÔNG mở được hộp chọn (chooser timeout) -> lần 2 thường mở được.
-    for _ in range(2):
+def _batch_upload(page, src, log):
+    """
+    Up 1 đoạn vào phiên bằng cách nạp THẲNG vào ô upload đơn (set_input_files) —
+    KHÔNG bấm nút '+ Upload' rồi bắt hộp chọn file như trước: đường đó chậm (mỗi
+    cú trượt tốn 8s chờ chooser) và hay trượt, khi trượt lại rơi xuống nhánh dự
+    phòng nạp file vào ô đã chết -> đoạn không bao giờ lên -> "không thấy card".
+
+    Nạp xong PHẢI thấy card mới thì mới tính là lên; bị nuốt thì nạp lại ngay.
+    Trả về card vừa tạo. Ném lỗi nếu nuốt hết `UPLOAD_TRIES` lần.
+    """
+    name = os.path.basename(src)
+    for attempt in range(1, UPLOAD_TRIES + 1):
+        loc = page.locator(SINGLE_FILE_INPUT_SELECTOR)
         try:
-            btn = page.get_by_role("button", name=re.compile(r"\bUpload\b", re.I)).first
-            if btn.count() == 0:
-                btn = page.get_by_text(re.compile(r"\bUpload\b", re.I)).first
-            btn.scroll_into_view_if_needed(timeout=2000)
-            with page.expect_file_chooser(timeout=8000) as fc:
-                btn.click(timeout=5000)
-            fc.value.set_files(src)
-            return
+            gone = loc.count() == 0
         except Exception:
-            page.wait_for_timeout(600)
-    # phòng hờ cuối: nạp thẳng vào input[type=file].
-    if _upload_via_input(page, src, log, lambda: False, timeout=10):
-        return
-    raise RuntimeError("không bấm được nút '+ Upload'")
+            gone = True
+        if gone:
+            # Mất ô upload (trang bị lạc sang chỗ khác) -> mở lại trang upload.
+            log("  Không thấy ô upload — mở lại trang upload.")
+            page.goto(UPLOAD_URL, wait_until="domcontentloaded")
+            _wait_dom_ready(page)
+            _dismiss_overlays(page, log)
+            loc = page.locator(SINGLE_FILE_INPUT_SELECTOR)
+
+        before = len(_leaf_cards(page))
+        try:
+            loc.first.set_input_files(src, timeout=8000)
+        except Exception as e:
+            log(f"  (nạp '{name}' lỗi lần {attempt}/{UPLOAD_TRIES}: {str(e)[:70]})")
+            page.wait_for_timeout(500)
+            continue
+
+        card = _wait_new_card(page, before)
+        if card is not None:
+            return card
+        if attempt < UPLOAD_TRIES:
+            log(f"  (vmake nuốt '{name}' lần {attempt} — nạp lại)")
+    raise RuntimeError(f"vmake nuốt file, không tạo card sau {UPLOAD_TRIES} lần nạp")
 
 
 def _download_card(page, card, dst, log, timeout_ms=120000):
@@ -1040,7 +1065,6 @@ def _run_batch(page, pending, removal_type, batch_size,
     in_flight = {}   # name -> {"src","dst","t0"}
     failed = []      # đoạn lỗi quá số lần -> BỎ QUA (không dừng cả mẻ)
     done = 0
-    first_upload = True
 
     while (pending or in_flight) and not should_stop():
         # 1) Up bù cho đủ batch_size.
@@ -1048,13 +1072,13 @@ def _run_batch(page, pending, removal_type, batch_size,
             src, dst = pending.pop(0)
             name = os.path.basename(src)
             try:
-                before = len(_leaf_cards(page))   # để biết upload có tạo card mới không
-                _batch_upload(page, src, log, first_upload)
-                first_upload = False
-                card = _wait_task_card(page, name, timeout=45, before=before)
-                if card is None:
-                    raise RuntimeError(f"không thấy card '{name}' sau khi up")
+                # Đã xác nhận có card mới -> đoạn CHẮC CHẮN đã lên.
+                _batch_upload(page, src, log)
                 if not is_smart:
+                    # Loại ≠ Smart phải bấm đúng card -> chờ nhãn tên hiện.
+                    card = _wait_task_card(page, name, timeout=45)
+                    if card is None:
+                        raise RuntimeError(f"không thấy tên '{name}' trên card để chọn loại")
                     _apply_type_in_card(page, card, removal_type, log)
                 in_flight[name] = {"src": src, "dst": dst, "t0": time.time()}
                 log(f"  [+] Up '{name}' — đang xử lý {len(in_flight)}/{batch_size}")
@@ -1156,7 +1180,14 @@ def process_videos(jobs, mode="auto", headless=False, per_video_timeout=300,
             _wait_dom_ready(page)
             _dismiss_overlays(page, log)
             page.wait_for_timeout(1500)
-            _clear_all_task_cards(page, log)   # xác nhận sạch task cũ trước khi up
+            # Phiên đăng nhập khôi phục task cũ khá TRỄ (có cái hiện sau cả chục
+            # giây) -> dọn 1 lần là chưa chắc sạch: card cũ lò dò hiện sau đó sẽ
+            # bị đếm nhầm thành "card mới" lúc xác nhận upload. Dọn tới khi ĐỨNG YÊN.
+            for _ in range(4):
+                _clear_all_task_cards(page, log)
+                page.wait_for_timeout(2500)
+                if not _leaf_cards(page):
+                    break
 
             done += _run_batch(page, pending, removal_type, batch_size,
                                per_video_timeout, delay_min, delay_max,
