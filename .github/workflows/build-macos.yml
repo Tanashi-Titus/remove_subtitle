@@ -33,20 +33,27 @@ jobs:
           BIN=dist/TNT_VideoSubtitleRemover.app/Contents/MacOS/TNT_VideoSubtitleRemover
           export QT_QPA_PLATFORM=offscreen
           rm -f dist/machine_id.txt
-          # Runner không có license -> app tính mã máy, GHI machine_id.txt (trước dialog),
-          # rồi kẹt ở dialog -> timeout kết thúc. Có machine_id.txt = app CHẠY được,
-          # nghĩa là cryptography/OpenSSL đã được đóng gói đúng.
-          OUT=$(timeout 90 "$BIN" 2>&1 || true)
-          echo "$OUT"
-          if echo "$OUT" | grep -qi "No module named 'cryptography'\|No module named cryptography"; then
+          # macOS KHÔNG có lệnh 'timeout' -> chạy nền, đợi machine_id.txt xuất hiện
+          # (app ghi file này TRƯỚC khi hiện dialog), rồi tự kill. Có file = app chạy
+          # được = cryptography/OpenSSL đã đóng gói đúng.
+          "$BIN" > smoke.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 90); do
+            [ -f dist/machine_id.txt ] && break
+            kill -0 "$PID" 2>/dev/null || break     # app đã tự thoát
+            sleep 1
+          done
+          kill "$PID" 2>/dev/null || true
+          wait "$PID" 2>/dev/null || true
+          echo "----- app output -----"; cat smoke.log || true; echo "----------------------"
+          if grep -qi "No module named 'cryptography'" smoke.log; then
             echo "❌ VẪN thiếu cryptography trong bundle."; exit 1
           fi
-          MID=$(find dist -maxdepth 2 -name machine_id.txt 2>/dev/null | head -1)
-          if [ -z "$MID" ]; then
-            echo "❌ App KHÔNG khởi động được tới bước license — nghi crash sớm."; exit 1
+          if [ ! -f dist/machine_id.txt ]; then
+            echo "❌ App KHÔNG khởi động được tới bước license — xem app output ở trên."; exit 1
           fi
           echo "✅ App khởi động OK trên macOS (cryptography đã gói đúng). Mã máy runner:"
-          cat "$MID"
+          cat dist/machine_id.txt
           rm -f dist/machine_id.txt
 
       - name: Tải kết quả lên (artifact)
