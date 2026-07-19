@@ -152,11 +152,25 @@ def _win_volume_serial() -> str:
     return ""
 
 
-def _mac_hw_uuid() -> str:
-    """IOPlatformUUID trên macOS — định danh phần cứng ổn định."""
-    out = _run(["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"])
-    for line in out.splitlines():
-        if "IOPlatformUUID" in line:
+# Đường dẫn TUYỆT ĐỐI tới ioreg. Khi app mở bằng double-click (Finder/launchd),
+# PATH bị rút gọn và KHÔNG có /usr/sbin → gọi "ioreg" trần sẽ không tìm thấy →
+# mã máy tính ra KHÁC so với lúc chạy trong Terminal → license không khớp.
+# Dùng đường dẫn tuyệt đối để mã máy GIỐNG HỆT nhau ở mọi cách mở.
+_IOREG = "/usr/sbin/ioreg"
+
+
+def _ioreg_device() -> str:
+    """Chạy ioreg (thử tuyệt đối trước, rồi PATH) — trả nguyên output."""
+    for cmd0 in (_IOREG, "ioreg"):
+        out = _run([cmd0, "-rd1", "-c", "IOPlatformExpertDevice"])
+        if out:
+            return out
+    return ""
+
+
+def _ioreg_value(key: str) -> str:
+    for line in _ioreg_device().splitlines():
+        if key in line:
             # dạng:  "IOPlatformUUID" = "XXXX-...."
             parts = line.split('"')
             if len(parts) >= 4:
@@ -164,14 +178,13 @@ def _mac_hw_uuid() -> str:
     return ""
 
 
+def _mac_hw_uuid() -> str:
+    """IOPlatformUUID trên macOS — định danh phần cứng ổn định."""
+    return _ioreg_value("IOPlatformUUID")
+
+
 def _mac_serial() -> str:
-    out = _run(["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"])
-    for line in out.splitlines():
-        if "IOPlatformSerialNumber" in line:
-            parts = line.split('"')
-            if len(parts) >= 4:
-                return parts[3].strip()
-    return ""
+    return _ioreg_value("IOPlatformSerialNumber")
 
 
 def _linux_machine_id() -> str:
@@ -244,10 +257,21 @@ def machine_id_pretty(mid: str | None = None) -> str:
 #  3. ĐỌC & KIỂM license.key
 # --------------------------------------------------------------------- #
 def _app_dir() -> Path:
-    """Thư mục của tool đang chạy (cạnh exe khi đóng gói, cạnh script khi chạy code)."""
+    """
+    Thư mục để TÌM/GHI license.key & machine_id.txt (cạnh tool đang chạy).
+
+    - Windows/Linux đóng gói: cạnh file thực thi.
+    - macOS đóng gói .app: file thực thi nằm trong Foo.app/Contents/MacOS/, nên
+      trả về thư mục CHỨA .app → người dùng đặt license.key CẠNH .app là đúng
+      (trực quan, không phải chui vào trong bundle).
+    - Chạy code: cạnh script.
+    """
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    # __file__ có thể nằm trong thư mục tool (vì mỗi tool nhúng 1 bản copy).
+        exe = Path(sys.executable).resolve()
+        for p in exe.parents:
+            if p.suffix == ".app":
+                return p.parent            # thư mục chứa Foo.app
+        return exe.parent
     return Path(sys.argv[0]).resolve().parent if sys.argv and sys.argv[0] else Path.cwd()
 
 

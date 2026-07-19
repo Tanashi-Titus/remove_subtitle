@@ -28,11 +28,14 @@ BUNDLE_CHROMIUM = False
 from PyInstaller.utils.hooks import collect_all
 
 datas, binaries, hiddenimports = [], [], []
-for pkg in ("playwright",):
+# cryptography (lớp license) có phần Rust biên dịch (_rust) + cffi -> PHẢI collect_all
+# mới gói đủ, nếu không sẽ lỗi "No module named 'cryptography'" khi chạy trên máy đích.
+for pkg in ("playwright", "cryptography", "cffi"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
     hiddenimports += h
+hiddenimports += ["cryptography.hazmat.bindings._rust", "_cffi_backend"]
 
 if os.path.exists("logo.png"):
     datas += [("logo.png", ".")]

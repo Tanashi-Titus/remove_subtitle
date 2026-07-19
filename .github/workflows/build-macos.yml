@@ -28,6 +28,27 @@ jobs:
       - name: Build .app (ffmpeg + Chromium nhúng sẵn, đúng kiến trúc runner)
         run: bash build_mac.sh
 
+      - name: Smoke test — app THẬT khởi động được (bắt lỗi thiếu cryptography)
+        run: |
+          BIN=dist/TNT_VideoSubtitleRemover.app/Contents/MacOS/TNT_VideoSubtitleRemover
+          export QT_QPA_PLATFORM=offscreen
+          rm -f dist/machine_id.txt
+          # Runner không có license -> app tính mã máy, GHI machine_id.txt (trước dialog),
+          # rồi kẹt ở dialog -> timeout kết thúc. Có machine_id.txt = app CHẠY được,
+          # nghĩa là cryptography/OpenSSL đã được đóng gói đúng.
+          OUT=$(timeout 90 "$BIN" 2>&1 || true)
+          echo "$OUT"
+          if echo "$OUT" | grep -qi "No module named 'cryptography'\|No module named cryptography"; then
+            echo "❌ VẪN thiếu cryptography trong bundle."; exit 1
+          fi
+          MID=$(find dist -maxdepth 2 -name machine_id.txt 2>/dev/null | head -1)
+          if [ -z "$MID" ]; then
+            echo "❌ App KHÔNG khởi động được tới bước license — nghi crash sớm."; exit 1
+          fi
+          echo "✅ App khởi động OK trên macOS (cryptography đã gói đúng). Mã máy runner:"
+          cat "$MID"
+          rm -f dist/machine_id.txt
+
       - name: Tải kết quả lên (artifact)
         uses: actions/upload-artifact@v4
         with:

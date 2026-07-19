@@ -1,0 +1,65 @@
+========================================================================
+  TNT VIDEO SUBTITLE REMOVER — HƯỚNG DẪN CHO MÁY MAC
+========================================================================
+
+App KHÔNG bị lỗi. macOS chặn mọi app chưa mua chứng nhận Apple ($99/năm) —
+đây là cơ chế an toàn của Mac (Gatekeeper), không phải virus. Làm theo bên dưới
+1 LẦN là chạy bình thường mãi về sau.
+
+⚠️ Khi thấy bảng "...chưa được mở / Apple không thể xác minh..."  ->  ĐỪNG bấm
+   "Chuyển vào Thùng rác". Bấm "Xong" rồi làm 1 trong 2 cách dưới.
+
+------------------------------------------------------------------------
+ CÁCH 1 — Chuột phải (dễ nhất, thử trước)
+------------------------------------------------------------------------
+  1. Mở Finder, tìm file  TNT_VideoSubtitleRemover.app
+  2. Giữ phím Control rồi bấm vào app  (hoặc chuột phải)  ->  chọn  Open
+  3. Bảng cảnh báo hiện lại, LẦN NÀY có nút  "Open"  ->  bấm Open
+  4. Xong. Từ nay double-click mở như bình thường.
+
+------------------------------------------------------------------------
+ CÁCH 2 — Nếu Cách 1 vẫn chỉ hiện "Chuyển vào Thùng rác"
+          (macOS Sonoma/Sequoia siết chặt hơn)
+------------------------------------------------------------------------
+ A) Cách bấm nút (không cần gõ lệnh):
+     1. Mở  System Settings (Cài đặt hệ thống)
+     2. Vào  Privacy & Security (Quyền riêng tư & Bảo mật)
+     3. Kéo xuống, thấy dòng:
+           "TNT_VideoSubtitleRemover" đã bị chặn...
+        ->  bấm  "Open Anyway" (Vẫn mở)
+     4. Nhập mật khẩu máy nếu được hỏi  ->  mở app.
+
+ B) Cách dùng Terminal (chắc ăn nhất):
+     1. Mở  Terminal  (Spotlight: gõ "Terminal" -> Enter)
+     2. Gõ đúng dòng sau, KÈM 1 dấu cách ở cuối:
+           xattr -dr com.apple.quarantine
+     3. KÉO-THẢ file TNT_VideoSubtitleRemover.app vào cửa sổ Terminal
+        (nó tự điền đường dẫn)  ->  bấm Enter
+     4. Không báo gì = thành công. Double-click mở app bình thường.
+
+------------------------------------------------------------------------
+ YÊU CẦU MÁY
+------------------------------------------------------------------------
+  * macOS 11 trở lên.
+  * Cài sẵn Google Chrome (tool điều khiển Chrome để tạo/ xử lý).
+
+------------------------------------------------------------------------
+ LẤY LICENSE (lần đầu chạy)
+------------------------------------------------------------------------
+  1. Mở app lần đầu -> vì máy chưa có license, app hiện cửa sổ "MÃ MÁY".
+  2. Bấm nút  [ 📋 Copy mã máy ]  rồi gửi mã đó cho người quản trị.
+     (Mã máy cũng được lưu ở file machine_id.txt cạnh app.)
+  3. Quản trị gửi lại file  license.key. Đặt vào MỘT trong hai chỗ:
+        (a) cùng thư mục với app, HOẶC
+        (b) /Library/Application Support/TNT/license.key
+     Tạo thư mục TNT nếu chưa có. Trong Finder: menu "Go" -> "Go to Folder..."
+     -> gõ  /Library/Application Support/  -> tạo thư mục TNT rồi bỏ file vào.
+  4. Mở lại app -> dùng bình thường.
+
+------------------------------------------------------------------------
+ LƯU Ý
+------------------------------------------------------------------------
+  * license.key gắn với ĐÚNG MÁY này. Copy sang máy Mac khác sẽ KHÔNG chạy.
+  * Đổi máy / thay phần cứng lớn -> mã máy đổi -> phải xin license mới.
+  * Gặp lỗi -> chụp màn hình gửi quản trị.
+========================================================================
